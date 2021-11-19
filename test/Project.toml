@@ -1,0 +1,8 @@
+[deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+POMDPModelTools = "08074719-1b2a-587c-a292-00f91cc44415"
+POMDPModels = "355abbd5-f08e-5560-ac9e-8b5f2592a0ca"
+POMDPs = "a93abf59-7444-517b-a68a-c42f96afdd7d"
+PPOMCPOW = "25216c65-08db-4c80-865f-731da37bf33c"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

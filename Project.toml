@@ -1,0 +1,11 @@
+name = "PPOMCPOW"
+uuid = "25216c65-08db-4c80-865f-731da37bf33c"
+authors = ["WhiffleFish <tylertronics@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+POMCPOW = "4c53ee00-974c-466f-8fa5-8dd73959bbab"
+POMDPModelTools = "08074719-1b2a-587c-a292-00f91cc44415"
+POMDPs = "a93abf59-7444-517b-a68a-c42f96afdd7d"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
