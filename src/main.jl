@@ -5,27 +5,28 @@ end
 
 function ParallelPOWSolver(;procs::Int=1, kwargs...)
     return ParallelPOWSolver(
-        POMCPOWSolver(kwargs..., tree_in_info=true),
+        POMCPOWSolver(;kwargs..., tree_in_info=true),
         procs
     )
 end
 
-struct ParallelPOWPlanner{POW <: POMCPOWPlanner}
+struct ParallelPOWPlanner{POW <: POMCPOWPlanner, P}
+    pomdp::P
     planners::Vector{POW}
 end
 
-function ParallelPOWPlanner(planner::POMCPOWPlanner, n::Int)
+function ParallelPOWPlanner(pomdp::POMDP, planner::POMCPOWPlanner, n::Int)
     planner_vec = Vector{POMCPOWPlanner}(undef, n)
     for i in 1:n
         p = deepcopy(planner)
         Random.seed!(p.solver.rng, rand(UInt32))
         planner_vec[i] = p
     end
-    return ParallelPOWPlanner(planner_vec)
+    return ParallelPOWPlanner(pomdp,planner_vec)
 end
 
 function POMDPs.solve(solver::ParallelPOWSolver, pomdp::POMDP)
-    return ParallelPOWPlanner(solve(solver.powsolver, pomdp), solver.procs)
+    return ParallelPOWPlanner(pomdp, solve(solver.powsolver, pomdp), solver.procs)
 end
 
 function baseQ(planner::POMCPOWPlanner{P}, b) where P
@@ -33,7 +34,8 @@ function baseQ(planner::POMCPOWPlanner{P}, b) where P
     tree = info[:tree]
 
     root = first(tree.tried)
-    Q_vec = Vector{Pair{actiontype(P),Float64}}(undef, length(root))
+    A = actiontype(P)
+    Q_vec = Vector{Pair{A,Float64}}(undef, length(root))
 
     for (i,anode) in enumerate(root)
         a = tree.a_labels[anode]
@@ -64,13 +66,13 @@ function maximizing_action(Q_dict::Dict{A, Float64}) where A
             a_opt = a
         end
     end
-    return a_opt
+    return a_opt::A
 end
 
 function POMDPModelTools.action_info(planner::ParallelPOWPlanner, b)
     t0 = time()
     planner_vec = planner.planners
-    A = actiontype(first(planner_vec).problem)
+    A = actiontype(planner.pomdp)
     vec = Vector{Vector{Pair{A, Float64}}}(undef, length(planner_vec))
 
     Threads.@threads for i in eachindex(vec)
