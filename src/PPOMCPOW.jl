@@ -6,8 +6,10 @@ using POMCPOW
 using Distributed
 using Random
 
-include("main.jl")
+include("RootParallel.jl")
+export RootParallelPOWSolver, RootParallelPOWPlanner
 
-export ParallelPOWSolver, ParallelPOWPlanner
+include("TreeParallel.jl") # not implemented yet
+export TreeParallelPOWSolver, TreeParallelPOWPlanner
 
 end # module
