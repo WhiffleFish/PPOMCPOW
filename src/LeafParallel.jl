@@ -3,7 +3,8 @@ struct ParallelRandomRolloutSolver{RNG<:Random.AbstractRNG}
     procs::Int
 end
 
-ParallelRandomRolloutSolver(procs::Int) = ParallelRandomRolloutSolver(Random.GLOBAL_RNG, procs)
+# Feeding Random.GLOBAL_RNG for parallel rollout estimator rng fails
+ParallelRandomRolloutSolver(procs::Int) = ParallelRandomRolloutSolver(Xoroshiro128Star(), procs)
 
 struct ParallelRandomRolloutEstimator{A, RNG<:Random.AbstractRNG}
     rngs::Vector{RNG}
@@ -19,7 +20,8 @@ end
 
 # estimate_value(pomcp.solved_estimate, pomcp.problem, sp, POWTreeObsNode(tree, hao), d-1)
 function estimate_value(estimator::ParallelRandomRolloutEstimator, pomdp::POMDP{S}, s::S, ::Any, depth::Int) where S
-    return Folds.mapreduce(rng -> rollout(estimator, rng, pomdp, s, depth), +, estimator.rngs)
+    v_sum = Folds.mapreduce(rng -> rollout(estimator, rng, pomdp, s, depth), +, estimator.rngs)
+    return v_sum/length(estimator.rngs)
 end
 
 function rollout(estim::ParallelRandomRolloutEstimator, rng::Random.AbstractRNG, pomdp::POMDP{S}, s::S, depth::Int) where {S}
@@ -30,7 +32,7 @@ function rollout(estim::ParallelRandomRolloutEstimator, rng::Random.AbstractRNG,
 
     while !isterminal(pomdp, s) && step ≤ depth
 
-        a = rand(estimator.actions, rng)
+        a = rand(rng, estim.actions)
 
         sp,r = @gen(:sp,:r)(pomdp, s, a, rng)
 
@@ -50,10 +52,10 @@ struct LeafParallelPOWSolver{POW <: POMCPOWSolver, RNG <: Random.AbstractRNG}
     procs::Int
 end
 
+# Feeding Random.GLOBAL_RNG for parallel rollout estimator rng fails
 function LeafParallelPOWSolver(;procs::Int=1, kwargs...)
-    rng = get(kwargs, :rng, Random.GLOBAL_RNG)
     return POMCPOWSolver(;
-        estimate_value = ParallelRandomRolloutSolver(rng, procs),
+        estimate_value = ParallelRandomRolloutSolver(procs),
         kwargs...
     )
 end
