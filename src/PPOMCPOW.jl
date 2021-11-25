@@ -4,6 +4,8 @@ using POMDPs
 using POMDPModelTools
 using POMCPOW
 using Distributed
+import MCTS: convert_estimator, estimate_value
+using Folds
 using Random
 
 include("RootParallel.jl")

@@ -5,6 +5,8 @@ version = "0.1.0"
 
 [deps]
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+Folds = "41a02a25-b8f0-4f67-bc48-60067656b558"
+MCTS = "e12ccd36-dcad-5f33-8774-9175229e7b33"
 POMCPOW = "4c53ee00-974c-466f-8fa5-8dd73959bbab"
 POMDPModelTools = "08074719-1b2a-587c-a292-00f91cc44415"
 POMDPs = "a93abf59-7444-517b-a68a-c42f96afdd7d"

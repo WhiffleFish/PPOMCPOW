@@ -1,6 +1,7 @@
  # previously `search`
 function build_tree!(pomcp::POMCPOWPlanner, tree)
     iter = 0
+    all_terminal = true
     max_depth = min(
         pomcp.solver.max_depth,
         ceil(Int, log(pomcp.solver.eps)/log(discount(pomcp.problem)))
@@ -8,13 +9,14 @@ function build_tree!(pomcp::POMCPOWPlanner, tree)
     t0 = time()
     while iter < pomcp.solver.tree_queries && time() - t0 < pomcp.solver.max_time
         s = rand(pomcp.solver.rng, tree.root_belief)
+        iter += 1
         if !POMDPs.isterminal(pomcp.problem, s)
-            iter += 1
             POMCPOW.simulate(pomcp, POWTreeObsNode(tree, 1), s, max_depth)
+            all_terminal = false
         end
     end
 
-    return iter == 0
+    return all_terminal
 end
 
 # previouly `action_info`
