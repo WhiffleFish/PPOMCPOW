@@ -40,43 +40,22 @@ Fields:
 - `check_repeat_act::Bool`:
     Check if an action was sampled multiple times. This has some dictionary maintenance overhead, but prevents multiple nodes with the same action from being created. If the action space is discrete, this should probably be used, but can be turned off for speed.
     default: `true`
-- `tree_in_info::Bool`:
-    If `true`, return the tree in the info dict when action_info is called, this can use a lot of memory if histories are being saved.
-    default: `false`
 - `k_action::Float64`, `alpha_action::Float64`, `k_observation::Float64`, `alpha_observation::Float64`:
         These constants control the double progressive widening. A new observation
         or action will be added if the number of children is less than or equal to kN^alpha.
         defaults: k: `10`, alpha: `0.5`
-- `init_V::Any`:
-    Function, object, or number used to set the initial V(h,a) value at a new node.
-    If this is a function `f`, `f(pomdp, h, a)` will be called to set the value.
-    If this is an object `o`, `init_V(o, pomdp, h, a)` will be called.
-    If this is a number, V will be set to that number
-    default: `0.0`
-- `init_N::Any`:
-    Function, object, or number used to set the initial N(s,a) value at a new node.
-    If this is a function `f`, `f(pomdp, h, a)` will be called to set the value.
-    If this is an object `o`, `init_N(o, pomdp, h, a)` will be called.
-    If this is a number, N will be set to that number
-    default: `0`
-- `default_action::Any`:
-    Function, action, or Policy used to determine the action if POMCP fails with exception `ex`.
-    If this is a Function `f`, `f(pomdp, belief, ex)` will be called.
-    If this is a Policy `p`, `action(p, belief)` will be called.
-    If it is an object `a`, `default_action(a, pomdp, belief, ex)` will be called, and
-    if this method is not implemented, `a` will be returned directly.
 """
-@with_kw mutable struct TreeParallelPOWSolver{RNG<:AbstractRNG} <: AbstractPOMCPSolver
+@with_kw mutable struct TreeParallelPOWSolver{CRIT1,CRIT2,RNG,UPD,EV} <: AbstractPOMCPSolver
     eps::Float64                = 0.01
     max_depth::Int              = typemax(Int)
-    criterion                   = MaxUCB(1.0)
-    final_criterion             = MaxQ()
+    criterion::CRIT1            = MaxUCB(1.0)
+    final_criterion::CRIT2      = MaxQ()
     tree_queries::Int           = 1000
     max_time::Float64           = Inf
     rng::RNG                    = Xoroshiro128Star()
-    node_sr_belief_updater      = POWNodeFilter()
+    node_sr_belief_updater::UPD = POWNodeFilter()
 
-    estimate_value::Any         = TSRandomRolloutSolver()
+    estimate_value::EV          = TSRandomRolloutSolver()
 
     enable_action_pw::Bool      = true
     check_repeat_obs::Bool      = true
@@ -87,9 +66,6 @@ Fields:
     k_observation::Float64      = 10.0
     alpha_action::Float64       = 0.5
     k_action::Float64           = 10.0
-    init_V::Any                 = 0.0
-    init_N::Any                 = 0
-    default_action::Any         = ExceptionRethrow()
 end
 
 function MCTS.convert_estimator(ev::TSRandomRolloutSolver, solver::TreeParallelPOWSolver, pomdp::POMDP)

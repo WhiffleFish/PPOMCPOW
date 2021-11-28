@@ -14,10 +14,7 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
         if length(tree.tried[h]) ≤ sol.k_action*total_n^sol.alpha_action
             a = rand(rng, actions(problem))
             if !sol.check_repeat_act || !haskey(tree.o_child_lookup, (h,a))
-                push_anode!(tree, h, a,
-                            init_N(pomcp.init_N, problem, TreeParallelPOWTreeObsNode(tree, h), a),
-                            init_V(pomcp.init_V, problem, TreeParallelPOWTreeObsNode(tree, h), a),
-                            sol.check_repeat_act)
+                push_anode!(tree, h, a, 0, 0.0, sol.check_repeat_act)
             end
         end
     else # run through all the actions
@@ -29,14 +26,10 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
             end
             anode = length(tree.n)
             for a in action_space_iter
-                push_anode!(tree, h, a,
-                            init_N(pomcp.init_N, problem, TreeParallelPOWTreeObsNode(tree, h), a),
-                            init_V(pomcp.init_V, problem, TreeParallelPOWTreeObsNode(tree, h), a),
-                            false)
+                push_anode!(tree, h, a, 0, 0.0, false)
             end
         end
     end
-    total_n = tree.total_n[h][]
 
     best_node = select_best(tree, pomcp.criterion, h_node, rng)
     a = tree.a_labels[best_node]
@@ -55,13 +48,15 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
                 problem,
                 tree,
                 best_node,
-                s, a, sp, o, r;
+                s, a, sp, o, r,
                 sol.check_repeat_obs
             )
         end
-        lock.(tree.a_locks)
-            push!(tree.generated[best_node], o=>hao)
-        unlock.(tree.a_locks)
+        lock(tree.tree_lock)
+            lock.(tree.a_locks)
+                push!(tree.generated[best_node], o=>hao)
+            unlock.(tree.a_locks)
+        unlock(tree.tree_lock)
     else
 
         sp, r = @gen(:sp, :r)(problem, s, a, rng)
@@ -84,8 +79,8 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
         R = r + γ*simulate(pomcp, TreeParallelPOWTreeObsNode(tree, hao), sp, d-1, rng)
     end
 
-    Threads.atomic_add!(tree.n[best_node], 1)
-    Threads.atomic_add!(tree.total_n[h], 1)
+    atomic_add!(tree.n[best_node], 1)
+    atomic_add!(tree.total_n[h], 1)
     lock(tree.a_locks[best_node])
     if tree.v[best_node] != -Inf
         tree.v[best_node] += (R-tree.v[best_node])/tree.n[best_node][]
