@@ -1,4 +1,5 @@
 [deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 MCTS = "e12ccd36-dcad-5f33-8774-9175229e7b33"
 POMDPModelTools = "08074719-1b2a-587c-a292-00f91cc44415"
 POMDPModels = "355abbd5-f08e-5560-ac9e-8b5f2592a0ca"

@@ -3,6 +3,7 @@ using POMDPs, POMDPModels, POMDPModelTools, POMDPSimulators, POMDPPolicies
 using MCTS
 using Test
 using Random
+using BenchmarkTools
 
 @testset "Basic Functionality" begin
     pomdp = LightDark1D()
@@ -10,9 +11,25 @@ using Random
     planner = solve(sol, pomdp)
     @inferred action_info(planner, initialstate(pomdp))
 
+    bm = @benchmark action_info($planner, $(initialstate(pomdp))) seconds=2
+    mean_time = mean(bm).time * 1e-9 # in seconds
+    @test ≈(mean_time, 0.1, atol=0.05)
+
+
     sol = LeafParallelPOWSolver(procs=4, max_time=0.1, tree_queries=100_000)
     planner = solve(sol, pomdp)
     @inferred action_info(planner, initialstate(pomdp))
+
+    # time constraint test for leaf parallel likely fails due to use of `CPUTime_us` in POMCPOW.jl
+    #=
+    bm = @benchmark action_info($planner, $(initialstate(pomdp))) seconds=2
+    mean_time = mean(bm).time * 1e-9 # in seconds
+    @test ≈(mean_time, 0.1, atol=0.05)
+    =#
+
+    # sol = TreeParallelPOWSolver(max_time=0.1, tree_queries=100_000)
+    # planner = solve(sol, pomdp)
+    # @inferred action_info(planner, initialstate(pomdp))
 end
 
 @testset "Leaf Evaluation" begin
