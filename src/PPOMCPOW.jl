@@ -3,11 +3,12 @@ module PPOMCPOW
 using POMDPs
 using POMDPModelTools
 using POMCPOW
-using Distributed
 import MCTS: convert_estimator, estimate_value
 using RandomNumbers.Xorshifts
 using Folds
+using Base.Threads
 using Random
+using Reexport
 
 include("RootParallel.jl")
 export RootParallelPOWSolver, RootParallelPOWPlanner
@@ -15,7 +16,7 @@ export RootParallelPOWSolver, RootParallelPOWPlanner
 include("LeafParallel.jl")
 export LeafParallelPOWSolver
 
-include("TreeParallel.jl") # not implemented yet
-export TreeParallelPOWSolver, TreeParallelPOWPlanner
+include(joinpath("TreeParallel","TreeParallelPOMCPOW.jl"))
+@reexport using .TreeParallelPOMCPOW
 
 end # module

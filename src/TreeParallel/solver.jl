@@ -1,6 +1,5 @@
 """
-    POMCPOWSolver
-Partially observable Monte Carlo planning with observation widening.
+    TreeParallelPOWSolver
 Fields:
 - `eps::Float64`:
     Rollouts and tree expansion will stop when discount^depth is less than this.
@@ -91,4 +90,8 @@ Fields:
     init_V::Any                 = 0.0
     init_N::Any                 = 0
     default_action::Any         = ExceptionRethrow()
+end
+
+function MCTS.convert_estimator(ev::TSRandomRolloutSolver, solver::TreeParallelPOWSolver, pomdp::POMDP)
+    return TSRandomRolloutEstimator(actions(pomdp))
 end

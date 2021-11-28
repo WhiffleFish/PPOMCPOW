@@ -1,4 +1,4 @@
-function select_best(tree::TreeParallelPOWTree, crit::MaxUCB, h_node::POWTreeObsNode, rng::AbstractRNG)
+function select_best(tree::TreeParallelPOWTree, crit::MaxUCB, h_node::TreeParallelPOWTreeObsNode, rng::AbstractRNG)
     h = h_node.node
     best_criterion_val = -Inf
     local best_node::Int
@@ -34,7 +34,7 @@ function select_best(tree::TreeParallelPOWTree, crit::MaxUCB, h_node::POWTreeObs
     end
 end
 
-function select_best(tree::TreeParallelPOWTree, crit::MaxQ, h_node::POWTreeObsNode, rng::AbstractRNG)
+function select_best(tree::TreeParallelPOWTree, crit::MaxQ, h_node::TreeParallelPOWTreeObsNode, rng::AbstractRNG)
     tree = h_node.tree
     h = h_node.node
     best_node = first(tree.tried[h])
@@ -49,11 +49,11 @@ function select_best(tree::TreeParallelPOWTree, crit::MaxQ, h_node::POWTreeObsNo
     return best_node
 end
 
-function select_best(tree::TreeParallelPOWTree, crit::MaxTries, h_node::POWTreeObsNode, rng::AbstractRNG)
+function select_best(tree::TreeParallelPOWTree, crit::MaxTries, h_node::TreeParallelPOWTreeObsNode, rng::AbstractRNG)
     tree = h_node.tree
     h = h_node.node
     best_node = first(tree.tried[h])
-    best_n = tree.n[best_node]
+    best_n = tree.n[best_node][]
     @assert !isnan(best_n)
     for node in tree.tried[h][2:end]
         if tree.n[node][] >= best_n

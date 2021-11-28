@@ -25,7 +25,7 @@ struct TreeParallelPOWTree{B,A,O,RB}
         sz = min(sz, 100_000)
         return new(
             sizehint!(Threads.Atomic{Int}[], sz),
-            sizehint!(Threads.Atomic{Int}[], sz),
+            sizehint!(Float64[], sz),
             sizehint!(Vector{Pair{O,Int}}[], sz),
             Dict{Tuple{Int,O}, Int}(),
             sizehint!(A[], sz),
@@ -47,7 +47,8 @@ struct TreeParallelPOWTree{B,A,O,RB}
 end
 
 @inline function push_bnode!(
-        pomcp::TreeParallelPOWPlanner,
+        node_sr_belief_updater,
+        problem::POMDP,
         tree::TreeParallelPOWTree{B,A,O},
         best_node::Int,
         s, a::A, sp, o::O, r::Real,
@@ -56,12 +57,12 @@ end
     lock.(tree.b_locks)
         hao = length(tree.sr_beliefs) + 1
         push!(tree.sr_beliefs,
-              init_node_sr_belief(pomcp.node_sr_belief_updater,
-                                  pomcp.problem, s, a, sp, o, r))
+              init_node_sr_belief(node_sr_belief_updater,
+                                  problem, s, a, sp, o, r))
         push!(tree.total_n, Threads.Atomic{Int}(0))
         push!(tree.tried, Int[])
         push!(tree.o_labels, o)
-        check_repeat_obs && tree.a_child_lookup[(best_node, o)] = hao
+        check_repeat_obs && (tree.a_child_lookup[(best_node, o)] = hao)
     unlock.(tree.b_locks)
 
     Threads.atomic_add!(tree.n_a_children[best_node], 1)
@@ -73,9 +74,9 @@ end
         tree::TreeParallelPOWTree{B,A,O},
         h::Int,
         a::A,
-        n::Int=0,
-        v::Float64=0.0,
-        update_lookup=true) where {B,A,O}
+        n::Int = 0,
+        v::Float64 = 0.0,
+        update_lookup = true) where {B,A,O}
 
     lock.(tree.a_locks)
         anode = length(tree.n) + 1
@@ -88,7 +89,7 @@ end
     unlock.(tree.a_locks)
 
     lock.(tree.b_locks)
-        update_lookup && tree.o_child_lookup[(h, a)] = anode
+        update_lookup && (tree.o_child_lookup[(h, a)] = anode)
         push!(tree.tried[h], anode)
     unlock.(tree.b_locks)
     Threads.atomic_add!(tree.total_n[h], n)
@@ -101,7 +102,7 @@ struct TreeParallelPOWTreeObsNode{B,A,O,RB} <: BeliefNode
     node::Int
 end
 
-isroot(h::TreeParallelPOWTreeObsNode) = h.node==1
+isroot(h::TreeParallelPOWTreeObsNode) = h.node == 1
 
 @inline function belief(h::TreeParallelPOWTreeObsNode)
     if isroot(h)
