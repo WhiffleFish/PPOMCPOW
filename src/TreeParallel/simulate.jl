@@ -1,35 +1,38 @@
 function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsNode, s, d::Int, rng::AbstractRNG)
+    println("begin simulate")
     h = h_node.node
     sol = pomcp.solver
     tree = h_node.tree
     problem = pomcp.problem
     γ = POMDPs.discount(pomcp.problem)
 
+    println("begin Terminal Check")
     if POMDPs.isterminal(problem, s) || d ≤ 0
         return 0.0
     end
 
     if sol.enable_action_pw
+        println("Begin Action PW")
         total_n = tree.total_n[h][]
+        @show total_n
         if length(tree.tried[h]) ≤ sol.k_action*total_n^sol.alpha_action
+            println("Action PW criteria met")
             a = rand(rng, actions(problem))
+            @show a
             if !sol.check_repeat_act || !haskey(tree.o_child_lookup, (h,a))
                 push_anode!(tree, h, a, 0, 0.0, sol.check_repeat_act)
             end
+            println("Ln 25")
         end
     else # run through all the actions
         if isempty(tree.tried[h])
-            if h == 1
-                action_space_iter = POMDPs.actions(problem, tree.root_belief)
-            else
-                action_space_iter = POMDPs.actions(problem, StateBelief(tree.sr_beliefs[h]))
-            end
             anode = length(tree.n)
-            for a in action_space_iter
+            for a in actions(problem)
                 push_anode!(tree, h, a, 0, 0.0, false)
             end
         end
     end
+    println("Finish Action Widening")
 
     best_node = select_best(tree, pomcp.criterion, h_node, rng)
     a = tree.a_labels[best_node]
@@ -43,7 +46,7 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
             hao = tree.a_child_lookup[(best_node, o)]
         else
             new_node = true
-            push_bnode!(
+            hao = push_bnode!(
                 pomcp.node_sr_belief_updater,
                 problem,
                 tree,
@@ -62,6 +65,7 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
         sp, r = @gen(:sp, :r)(problem, s, a, rng)
 
     end
+    println("Finish Observation Widening")
 
     if isinf(r)
         @warn("POMCPOW: +Inf reward. This is not recommended and may cause future errors.")
@@ -78,6 +82,7 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
 
         R = r + γ*simulate(pomcp, TreeParallelPOWTreeObsNode(tree, hao), sp, d-1, rng)
     end
+    println("Finish Observation Widening")
 
     atomic_add!(tree.n[best_node], 1)
     atomic_add!(tree.total_n[h], 1)
@@ -87,5 +92,6 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
     end
     unlock(tree.a_locks[best_node])
 
+    println("End Simulation")
     return R
 end

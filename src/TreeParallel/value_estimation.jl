@@ -1,3 +1,8 @@
+"""
+Thread-safe random rollout solver
+- takes rng argument for value estimation to prevent multiple threads from
+overwriting the same RNG state
+"""
 struct TSRandomRolloutSolver end
 
 struct TSRandomRolloutEstimator{A}

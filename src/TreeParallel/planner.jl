@@ -32,23 +32,22 @@ Random.seed!(p::TreeParallelPOWPlanner, seed) = Random.seed!(p.solver.rng, seed)
 
 function POMDPModelTools.action_info(pomcp::TreeParallelPOWPlanner, b)
     A = actiontype(pomcp.problem)
-    info = Dict{Symbol, Any}()
     tree = make_tree(pomcp, b)
     pomcp.tree = tree
     local a::A
-    try
-        a = search(pomcp, tree)
-        if pomcp.solver.tree_in_info
-            info[:tree] = tree
-        end
-    catch ex
-        if ex isa AllSamplesTerminal
-            a = rand(actions(pomcp.problem))
-        else
-            throw(ex)
-        end
-    end
-    return a, info
+    local iter::Int
+    local t0::Float64
+    # try
+        a, iter, t0 = search(pomcp, tree)
+    # catch ex
+    #     if ex isa AllSamplesTerminal
+    #         @warn("All Samples Terminal")
+    #         a = rand(actions(pomcp.problem))
+    #     else
+    #         throw(ex)
+    #     end
+    # end
+    return a, (tree_queries=iter, time=time()-t0)
 end
 
 POMDPs.action(pomcp::TreeParallelPOWPlanner, b) = first(action_info(pomcp, b))
@@ -62,28 +61,55 @@ function make_tree(p::TreeParallelPOWPlanner{SOL,P,NBU}, b) where {SOL,P,NBU}
 end
 
 function search(pomcp::TreeParallelPOWPlanner, tree::TreeParallelPOWTree)
-    iter = Atomic{Int}(0)
-    all_terminal = true
+    t0 = time()
+
+    chnl = Channel(5)
+    prod_task = Threads.@spawn task_producer(chnl, t0, pomcp)
+    n = (Threads.nthreads() ÷ 2) - 1
+    #  for i in 1:n
+    @sync Threads.@spawn task_taker(chnl, pomcp, tree)
+    # end
+
+    iter = fetch(prod_task)
+
+    length(tree.n) == 1 && throw(AllSamplesTerminal(tree.root_belief))
+
+    best_node = select_best(tree, pomcp.solver.final_criterion, TreeParallelPOWTreeObsNode(tree,1), pomcp.solver.rng)
+
+    return tree.a_labels[best_node], iter, t0
+end
+
+function task_producer(chnl::Channel, t0::Float64, pomcp::TreeParallelPOWPlanner)
+    max_iter = pomcp.solver.tree_queries
+    max_time = pomcp.solver.max_time
+    iter = 0
+    while time() - t0 < max_time && iter < max_iter
+        if length(chnl.data) < 2
+            @show iter
+            iter += 1
+            put!(chnl, :job)
+        end
+    end
+    close(chnl)
+    return iter
+end
+
+function task_taker(chnl::Channel, pomcp::TreeParallelPOWPlanner, tree::TreeParallelPOWTree)
     max_depth = min(
         pomcp.solver.max_depth,
         ceil(Int, log(pomcp.solver.eps)/log(discount(pomcp.problem)))
     )
-    t0 = time()
-    while iter[] < pomcp.solver.tree_queries && time() - t0 < pomcp.solver.max_time
-        Threads.@spawn begin
-            atomic_add!(iter, 1)
-            rng = pomcp.rngs[Threads.threadid()]
-            s = rand(rng, tree.root_belief)
-            if !POMDPs.isterminal(pomcp.problem, s)
-                simulate(pomcp, TreeParallelPOWTreeObsNode(tree, 1), s, max_depth, rng)
-                all_terminal = false
-            end
+
+    while isopen(chnl)
+        println("Channel Open")
+        @show isready(chnl)
+        take!(chnl)
+        println("Thread $(Threads.threadid()) took a job")
+        rng = pomcp.rngs[Threads.threadid()]
+        s = rand(rng, tree.root_belief)
+        if !isterminal(pomcp.problem, s)
+            simulate(pomcp, TreeParallelPOWTreeObsNode(tree, 1), s, max_depth, rng)
         end
+        println("Thread $(Threads.threadid()) completed a job")
     end
-
-    all_terminal && throw(AllSamplesTerminal(tree.root_belief))
-
-    best_node = select_best(tree, pomcp.solver.final_criterion, TreeParallelPOWTreeObsNode(tree,1), pomcp.solver.rng)
-
-    return tree.a_labels[best_node]
 end

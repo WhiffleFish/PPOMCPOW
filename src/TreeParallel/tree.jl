@@ -14,7 +14,7 @@ struct TreeParallelPOWTree{B,A,O,RB}
     o_child_lookup::Dict{Tuple{Int,A}, Int} # may not be maintained based on solver params
     o_labels::Vector{O}
 
-    tree_lock::ReentrantLock
+    tree_lock::ReentrantLock # Lock full tree to prevent any modification by other threads
     b_locks::Vector{ReentrantLock} # belief thread locks
     a_locks::Vector{ReentrantLock} # action thread locks
 
@@ -38,14 +38,17 @@ struct TreeParallelPOWTree{B,A,O,RB}
             sizehint!(Array{O}(undef, 1), sz),
 
             ReentrantLock(),
-            sizehint!(Array{ReentrantLock}(undef, 1), sz),
-            sizehint!(Array{ReentrantLock}(undef, 1), sz),
+            sizehint!(ReentrantLock[ReentrantLock()], sz),
+            sizehint!(ReentrantLock[ReentrantLock()], sz),
 
             root_belief
         )
     end
 end
 
+"""
+Push belief node to tree
+"""
 @inline function push_bnode!(
         node_sr_belief_updater,
         problem::POMDP,
@@ -64,14 +67,18 @@ end
             push!(tree.tried, Int[])
             push!(tree.o_labels, o)
             check_repeat_obs && (tree.a_child_lookup[(best_node, o)] = hao)
-        unlock.(tree.b_locks)
+            push!(tree.b_locks, ReentrantLock())
+        unlock.(tree.b_locks[1:end-1])
     unlock(tree.tree_lock)
 
     atomic_add!(tree.n_a_children[best_node], 1)
 
-    nothing
+    return hao
 end
 
+"""
+Push action node to tree
+"""
 @inline function push_anode!(
         tree::TreeParallelPOWTree{B,A,O},
         h::Int,
@@ -80,8 +87,11 @@ end
         v::Float64,
         update_lookup::Bool) where {B,A,O}
 
+    println("Pushing Action Node")
     lock(tree.tree_lock)
-        lock.(tree.a_locks)
+        println("Tree Locked")
+        for l in tree.a_locks; lock(l) end
+            println("All actions locked")
             anode = length(tree.n) + 1
             push!(tree.a_locks, ReentrantLock())
             push!(tree.n, Atomic{Int}(n))
@@ -89,14 +99,18 @@ end
             push!(tree.generated, Pair{O,Int}[])
             push!(tree.a_labels, a)
             push!(tree.n_a_children, Atomic{Int}(0))
-        unlock.(tree.a_locks)
+        for l in tree.a_locks[1:end-1]; unlock(l) end
+        println("All actions unlocked")
 
         lock.(tree.b_locks)
+            println("All beliefs locked")
             update_lookup && (tree.o_child_lookup[(h, a)] = anode)
             push!(tree.tried[h], anode)
         unlock.(tree.b_locks)
+        println("All beliefs unlocked")
         atomic_add!(tree.total_n[h], n)
     unlock(tree.tree_lock)
+    println("Tree unlocked")
 
     nothing
 end
