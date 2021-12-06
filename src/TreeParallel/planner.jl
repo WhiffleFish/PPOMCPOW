@@ -63,12 +63,12 @@ end
 function search(pomcp::TreeParallelPOWPlanner, tree::TreeParallelPOWTree)
     t0 = time()
 
-    chnl = Channel(5)
+    chnl = Channel{Symbol}(5)
     prod_task = Threads.@spawn task_producer(chnl, t0, pomcp)
     n = (Threads.nthreads() ÷ 2) - 1
-    #  for i in 1:n
-    @sync Threads.@spawn task_taker(chnl, pomcp, tree)
-    # end
+    @sync for i in 1:n
+        Threads.@spawn task_taker(chnl, pomcp, tree)
+    end
 
     iter = fetch(prod_task)
 
@@ -79,13 +79,19 @@ function search(pomcp::TreeParallelPOWPlanner, tree::TreeParallelPOWTree)
     return tree.a_labels[best_node], iter, t0
 end
 
+"""
+Task Producer/Distributer - Fills channel with a symbolic `:job` signal for the
+`task_taker` to `take!` as an indicator to run tree queries. Once tree query
+limit is reached or the maximum time has elapsed, `:job` signals are no longer
+produced and the channel is closed.
+"""
 function task_producer(chnl::Channel, t0::Float64, pomcp::TreeParallelPOWPlanner)
     max_iter = pomcp.solver.tree_queries
     max_time = pomcp.solver.max_time
     iter = 0
     while time() - t0 < max_time && iter < max_iter
         if length(chnl.data) < 2
-            @show iter
+            # @show iter
             iter += 1
             put!(chnl, :job)
         end
@@ -94,22 +100,35 @@ function task_producer(chnl::Channel, t0::Float64, pomcp::TreeParallelPOWPlanner
     return iter
 end
 
+"""
+While channel is open, `task_taker` operates on a worker thread running tree
+queries whenever the `:job` signal is taken from the channel. Process stops when
+channel is closed by `task_producer`.
+"""
 function task_taker(chnl::Channel, pomcp::TreeParallelPOWPlanner, tree::TreeParallelPOWTree)
     max_depth = min(
         pomcp.solver.max_depth,
         ceil(Int, log(pomcp.solver.eps)/log(discount(pomcp.problem)))
     )
 
-    while isopen(chnl)
-        println("Channel Open")
-        @show isready(chnl)
-        take!(chnl)
-        println("Thread $(Threads.threadid()) took a job")
+    while true
+        # println("Channel Open")
+        # @show isready(chnl)
+        try
+            take!(chnl)
+        catch ex
+            if ex isa InvalidStateException
+                break
+            else
+                throw(ex)
+            end
+        end
+        # println("Thread $(Threads.threadid()) took a job")
         rng = pomcp.rngs[Threads.threadid()]
         s = rand(rng, tree.root_belief)
         if !isterminal(pomcp.problem, s)
             simulate(pomcp, TreeParallelPOWTreeObsNode(tree, 1), s, max_depth, rng)
         end
-        println("Thread $(Threads.threadid()) completed a job")
+        # println("Thread $(Threads.threadid()) completed a job")
     end
 end

@@ -87,11 +87,11 @@ Push action node to tree
         v::Float64,
         update_lookup::Bool) where {B,A,O}
 
-    println("Pushing Action Node")
+    # println("Pushing Action Node")
     lock(tree.tree_lock)
-        println("Tree Locked")
-        for l in tree.a_locks; lock(l) end
-            println("All actions locked")
+        # println("Tree Locked")
+        lock.(tree.a_locks)
+            # println("All actions locked")
             anode = length(tree.n) + 1
             push!(tree.a_locks, ReentrantLock())
             push!(tree.n, Atomic{Int}(n))
@@ -99,18 +99,18 @@ Push action node to tree
             push!(tree.generated, Pair{O,Int}[])
             push!(tree.a_labels, a)
             push!(tree.n_a_children, Atomic{Int}(0))
-        for l in tree.a_locks[1:end-1]; unlock(l) end
-        println("All actions unlocked")
+        unlock.(tree.a_locks[1:end-1])
+        # println("All actions unlocked")
 
         lock.(tree.b_locks)
-            println("All beliefs locked")
+            # println("All beliefs locked")
             update_lookup && (tree.o_child_lookup[(h, a)] = anode)
             push!(tree.tried[h], anode)
         unlock.(tree.b_locks)
-        println("All beliefs unlocked")
+        # println("All beliefs unlocked")
         atomic_add!(tree.total_n[h], n)
     unlock(tree.tree_lock)
-    println("Tree unlocked")
+    # println("Tree unlocked")
 
     nothing
 end
