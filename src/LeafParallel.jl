@@ -1,3 +1,9 @@
+#=
+Leaf Parallelism
+- Instead of rolling out a single particle one time, rollout the particle \
+multiple times in parallel.
+=#
+
 struct ParallelRandomRolloutSolver{RNG<:Random.AbstractRNG}
     rng::RNG
     procs::Int
@@ -11,6 +17,9 @@ struct ParallelRandomRolloutEstimator{A, RNG<:Random.AbstractRNG}
     actions::A
 end
 
+"""
+Convert `ParallelRandomRolloutSolver` to `ParallelRandomRolloutEstimator`
+"""
 function convert_estimator(estimator::ParallelRandomRolloutSolver, ::Any, pomdp::POMDP)
     rng_vec = [
         Random.seed!(deepcopy(estimator.rng), rand(UInt64)) for _ in 1:estimator.procs

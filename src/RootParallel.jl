@@ -1,4 +1,16 @@
- # previously `search`
+#=
+Root Parallelism
+- Build multiple trees independently
+- Combine root Q-values of trees to choose action
+=#
+
+"""
+Modification of `search` in POMCPOW.jl
+
+Constructs a POMCPOW tree according to planner parameters and returns
+boolean that's true if all sampled particles in the root belief are terminal
+indicating that the tree does not extend past the root belief.
+"""
 function build_tree!(pomcp::POMCPOWPlanner, tree)
     iter = 0
     all_terminal = true
@@ -19,7 +31,16 @@ function build_tree!(pomcp::POMCPOWPlanner, tree)
     return all_terminal
 end
 
-# previouly `action_info`
+
+"""
+Modification of `action_info` in POMCPOW.jl
+
+Initializes a POMCPOW tree with `make_tree` according to root belief `b`, then
+constructs tree according to `POMCPOWPlanner` parameters. Finally, returns
+constructed tree and boolean indicating whether or not the constructed tree is
+empty (either due to root belief being terminal or not enough time alotted to
+complete even a single tree query).
+"""
 function tree_info(pomcp::POMCPOWPlanner{P,NBU}, b) where {P,NBU}
     #= TODO:
     make_tree rebuilds the whole tree from scratch at each action call
@@ -67,6 +88,12 @@ function POMDPs.solve(solver::RootParallelPOWSolver, pomdp::POMDP)
     return RootParallelPOWPlanner(pomdp, solve(solver.powsolver, pomdp), solver.procs)
 end
 
+
+"""
+Given a POMCPOW tree, return vector containing pairs `a => Q(b,a)` where `b` is
+the root belief of the tree and `a` is an action explored by the planner at the
+root.
+"""
 function baseQ(planner::POMCPOWPlanner{P}, b) where P
     tree, empty_tree = tree_info(planner, b)
 
@@ -83,6 +110,13 @@ function baseQ(planner::POMCPOWPlanner{P}, b) where P
     return Q_vec
 end
 
+
+"""
+Merge Q values produced by multiple trees
+
+INPUT: Vector of outputs produced by `baseQ`
+OUTPUT: Single dictionary mapping `a => Q(b,a)`
+"""
 function merge_Q_vecs(all_Qs::Vector{Vector{Pair{A, Float64}}}) where A
     #=
     TODO: Weight Q estimates by number of visits (i.e. the N in UCB eq.)

@@ -1,1 +1,1 @@
-# PPOMCPOW
+# Parallel POMCPOW
