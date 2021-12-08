@@ -1,18 +1,19 @@
 struct TreeParallelPOWTree{B,A,O,RB}
     # action nodes
-    n::Vector{Atomic{Int}}
-    v::Vector{Float64}
-    generated::Vector{Vector{Pair{O,Int}}}
-    a_child_lookup::Dict{Tuple{Int,O}, Int} # may not be maintained based on solver params
-    a_labels::Vector{A}
-    n_a_children::Vector{Atomic{Int}}
+    n::Vector{Atomic{Int}} # ba_idx => number of times tried
+    v::Vector{Float64} # ba_idx => value of ba_idx
+    generated::Vector{Vector{Pair{O,Int}}} # ba_idx => [(o_1=>bao_1), ..., (o_n=>bao_n)]
+    a_child_lookup::Dict{Tuple{Int,O}, Int} # (ba_idx,o) => b_idx
+    a_labels::Vector{A} # ba_idx => a
+    n_a_children::Vector{Atomic{Int}} # ba_idx => n_children
 
     # observation nodes
-    sr_beliefs::Vector{B} # first element is #undef
-    total_n::Vector{Atomic{Int}}
-    tried::Vector{Vector{Int}}
-    o_child_lookup::Dict{Tuple{Int,A}, Int} # may not be maintained based on solver params
-    o_labels::Vector{O}
+    sr_beliefs::Vector{B} # b_idx => particle_belief    (first element is #undef)
+    total_n::Vector{Atomic{Int}} # b_idx => num of times b_idx was visited in search
+    tried::Vector{Vector{Int}} # b_idx => [ba_idx1, ba_idx2, ..., ba_idxn] (may not even need this if we have n_tried)
+    n_tried::Vector{Atomic{Int}} # b_idx => length(tried[b_idx])
+    o_child_lookup::Dict{Tuple{Int,A}, Int} # (b_idx,a) => ba_idx
+    o_labels::Vector{O} # b'_idx => o (b'=τ(b,a,o)) (first element is #undef)
 
     tree_lock::ReentrantLock # Lock full tree to prevent any modification by other threads
     b_locks::Vector{ReentrantLock} # belief thread locks
@@ -34,6 +35,7 @@ struct TreeParallelPOWTree{B,A,O,RB}
             sizehint!(Array{B}(undef, 1), sz),
             sizehint!(Atomic{Int}[Atomic{Int}(0)], sz),
             sizehint!(Vector{Int}[Int[]], sz),
+            sizehint!(Atomic{Int}[], sz),
             Dict{Tuple{Int,A}, Int}(),
             sizehint!(Array{O}(undef, 1), sz),
 

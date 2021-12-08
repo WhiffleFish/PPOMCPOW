@@ -4,15 +4,22 @@ function push_all_actions!(
         h::Int) where {B,A,O}
 
     lock(tree.tree_lock)
+    println("$(threadid()) - tree locked")
     if isempty(tree.tried[h])
+        println("$(threadid()) - node $h empty")
         ACT = actions(problem)
         L = length(ACT)
         init_idx = length(tree.n)
         lock.(tree.a_locks)
+        println("\t$(threadid()) - actions locked")
         lock.(tree.b_locks)
+        println("\t$(threadid()) - beliefs locked")
             for (i,a) in enumerate(ACT)
+                @show all(islocked.(tree.b_locks))
                 anode = init_idx + i
-                push!(tree.a_locks, ReentrantLock())
+                println("pre a lock push")
+                push!(tree.a_locks, lock(ReentrantLock()))
+                println("pushed a locks")
                 push!(tree.n, Atomic{Int}(0))
                 push!(tree.v, 0.0)
                 push!(tree.generated, Pair{O,Int}[])
@@ -20,11 +27,16 @@ function push_all_actions!(
                 push!(tree.n_a_children, Atomic{Int}(0))
 
                 push!(tree.tried[h], anode)
+                atomic_add!(tree.n_tried[h], 1)
             end
+
         unlock.(tree.b_locks)
-        unlock.(tree.a_locks[1:end-L])
+        println("\t$(threadid()) - beliefs unlocked")
+        unlock.(tree.a_locks)
+        println("\t$(threadid()) - actions unlocked")
     end
     unlock(tree.tree_lock)
+    println("$(threadid()) - tree unlocked")
 end
 
 function push_action_pw!(
@@ -39,10 +51,13 @@ function push_action_pw!(
 
     lock(tree.b_locks[h])
     N = tree.total_n[h][]
-    if length(tree.tried[h]) ≤ k_a*N^α_a
+    if tree.n_tried[h][] ≤ k_a*N^α_a
         anode = length(tree.n) + 1
         a = rand(rng, actions(problem))
         if !sol.check_repeat_act || !haskey(tree.o_child_lookup, (h,a))
+            atomic_add!(tree.n_tried[h], 1)
+            unlock(tree.b_locks[h])
+
             lock(tree.tree_lock)
                 lock.(tree.a_locks)
                     push!(tree.a_locks, ReentrantLock())
@@ -54,12 +69,12 @@ function push_action_pw!(
                     update_lookup && (tree.o_child_lookup[(h, a)] = anode)
                 unlock.(tree.a_locks)
 
-                for (i,l) in enumerate(tree.b_locks)
-                    i ≠ h && lock(l) # i == h already locked
-                end
+                lock.(tree.b_locks)
                     push!(tree.tried[h], anode)
                 unlock.(tree.b_locks)
             unlock(tree.tree_lock)
+        else
+            unlock(tree.b_locks[h])
         end
     else
         unlock(tree.b_locks[h])
@@ -68,10 +83,10 @@ end
 
 
 function push_belief_pw!(
-        pomcp,
-        tree,
-        best_node, s, a, rng
-        )
+        pomcp::TreeParallelPOWPlanner,
+        tree::TreeParallelPOWTree{B,A},
+        best_node::Int, s, a::A, rng::AbstractRNG
+        ) where {B,A}
 
     new_node = false
     sol = pomcp.solver
@@ -86,6 +101,7 @@ function push_belief_pw!(
         sp, o, r = @gen(:sp, :o, :r)(problem, s, a, rng)
 
         if check_repeat_obs && haskey(tree.a_child_lookup, (best_node,o))
+            unlock(tree.a_locks[best_node])
             hao = tree.a_child_lookup[(best_node, o)]
 
             lock(tree.tree_lock)
@@ -96,6 +112,9 @@ function push_belief_pw!(
 
         else
             new_node = true
+            atomic_add!(tree.n_a_children[best_node], 1)
+            unlock(tree.a_locks[best_node])
+
             lock(tree.tree_lock)
             lock.(tree.b_locks)
                 hao = length(tree.sr_beliefs) + 1
@@ -104,19 +123,18 @@ function push_belief_pw!(
                                           problem, s, a, sp, o, r))
                 push!(tree.total_n, Atomic{Int}(0))
                 push!(tree.tried, Int[])
+                push!(tree.n_tried, Atomic{Int}(0))
                 push!(tree.o_labels, o)
                 check_repeat_obs && (tree.a_child_lookup[(best_node, o)] = hao)
                 push!(tree.b_locks, ReentrantLock())
             unlock.(tree.b_locks[1:end-1])
 
-            for (i,l) in enumerate(tree.a_locks)
-                i ≠ best_node && lock(l) # i == best_node already locked
-            end
+            lock.(tree.a_locks)
                 push!(tree.generated[best_node], o=>hao)
             unlock.(tree.a_locks)
 
             unlock(tree.tree_lock)
-            atomic_add!(tree.n_a_children[best_node], 1)
+
         end
     else
         unlock(tree.a_locks[best_node])

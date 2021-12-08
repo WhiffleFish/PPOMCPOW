@@ -5,21 +5,25 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
     problem = pomcp.problem
     γ = POMDPs.discount(pomcp.problem)
 
+    println("$(threadid()) - Begin Simulate")
     if POMDPs.isterminal(problem, s) || d ≤ 0
         return 0.0
     end
 
+    println("$(threadid()) - Begin Action Widening")
     if sol.enable_action_pw
         push_action_pw!(pomcp, tree, h, rng)
     else
         push_all_actions!(problem, tree, h)
     end
+    println("$(threadid()) - End Action Widening")
 
     best_node = select_best(tree, pomcp.criterion, h_node, rng)
     a = tree.a_labels[best_node]
 
+    println("$(threadid()) - Begin Observation Widening")
     sp, r, new_node = push_belief_pw!(pomcp, tree, best_node, s, a, rng)
-    # println("Finish Observation Widening")
+    println("$(threadid()) - End Observation Widening")
 
     if isinf(r)
         @warn("POMCPOW: +Inf reward. This is not recommended and may cause future errors.")
@@ -31,7 +35,11 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
         pair = rand(rng, tree.generated[best_node])
         o = pair.first
         hao = pair.second
-        push_weighted!(tree.sr_beliefs[hao], pomcp.node_sr_belief_updater, s, sp, r)
+        lock(tree.tree_lock)
+            lock.(tree.b_locks)
+                push_weighted!(tree.sr_beliefs[hao], pomcp.node_sr_belief_updater, s, sp, r)
+            unlock.(tree.b_locks)
+        unlock(tree.tree_lock)
         sp, r = rand(rng, tree.sr_beliefs[hao])
 
         R = r + γ*simulate(pomcp, TreeParallelPOWTreeObsNode(tree, hao), sp, d-1, rng)

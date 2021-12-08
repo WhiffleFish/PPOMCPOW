@@ -74,9 +74,10 @@ function search(pomcp::TreeParallelPOWPlanner, tree::TreeParallelPOWTree)
     @sync for i in 1:max_iter
         (time() - t0 > max_time) && break
         iter += 1
-        @show iter
-        Threads.@spawn begin
+        iter%4==0 && @show iter
+        # iter%4==0 && @show time() - t0
             rng = rngs[threadid()]
+            Threads.@spawn begin
             simulate(
                 pomcp,
                 TreeParallelPOWTreeObsNode(tree, 1),
