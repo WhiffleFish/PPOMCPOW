@@ -46,74 +46,7 @@ struct TreeParallelPOWTree{B,A,O,RB}
     end
 end
 
-"""
-Push belief node to tree
-"""
-@inline function push_bnode!(
-        node_sr_belief_updater,
-        problem::POMDP,
-        tree::TreeParallelPOWTree{B,A,O},
-        best_node::Int,
-        s, a::A, sp, o::O, r::Real,
-        check_repeat_obs::Bool) where {B,A,O}
-
-    lock(tree.tree_lock)
-        lock.(tree.b_locks)
-            hao = length(tree.sr_beliefs) + 1
-            push!(tree.sr_beliefs,
-                  init_node_sr_belief(node_sr_belief_updater,
-                                      problem, s, a, sp, o, r))
-            push!(tree.total_n, Atomic{Int}(0))
-            push!(tree.tried, Int[])
-            push!(tree.o_labels, o)
-            check_repeat_obs && (tree.a_child_lookup[(best_node, o)] = hao)
-            push!(tree.b_locks, ReentrantLock())
-        unlock.(tree.b_locks[1:end-1])
-    unlock(tree.tree_lock)
-
-    atomic_add!(tree.n_a_children[best_node], 1)
-
-    return hao
-end
-
-"""
-Push action node to tree
-"""
-@inline function push_anode!(
-        tree::TreeParallelPOWTree{B,A,O},
-        h::Int,
-        a::A,
-        n::Int,
-        v::Float64,
-        update_lookup::Bool) where {B,A,O}
-
-    # println("Pushing Action Node")
-    lock(tree.tree_lock)
-        # println("Tree Locked")
-        lock.(tree.a_locks)
-            # println("All actions locked")
-            anode = length(tree.n) + 1
-            push!(tree.a_locks, ReentrantLock())
-            push!(tree.n, Atomic{Int}(n))
-            push!(tree.v, v)
-            push!(tree.generated, Pair{O,Int}[])
-            push!(tree.a_labels, a)
-            push!(tree.n_a_children, Atomic{Int}(0))
-        unlock.(tree.a_locks[1:end-1])
-        # println("All actions unlocked")
-
-        lock.(tree.b_locks)
-            # println("All beliefs locked")
-            update_lookup && (tree.o_child_lookup[(h, a)] = anode)
-            push!(tree.tried[h], anode)
-        unlock.(tree.b_locks)
-        # println("All beliefs unlocked")
-        atomic_add!(tree.total_n[h], n)
-    unlock(tree.tree_lock)
-    # println("Tree unlocked")
-
-    nothing
-end
+##
 
 struct TreeParallelPOWTreeObsNode{B,A,O,RB} <: BeliefNode
     tree::TreeParallelPOWTree{B,A,O,RB}

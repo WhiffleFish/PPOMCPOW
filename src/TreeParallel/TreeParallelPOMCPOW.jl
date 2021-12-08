@@ -15,6 +15,7 @@ include("solver.jl")
 include("tree.jl")
 include("criteria.jl")
 include("planner.jl")
+include("progressive_widening.jl")
 include("simulate.jl")
 
 export TreeParallelPOWSolver, TreeParallelPOWPlanner
