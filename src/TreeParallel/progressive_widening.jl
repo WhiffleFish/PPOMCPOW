@@ -10,30 +10,27 @@ function push_all_actions!(
         ACT = actions(problem)
         L = length(ACT)
         init_idx = length(tree.n)
-        lock.(tree.a_locks)
-        println("\t$(threadid()) - actions locked")
-        lock.(tree.b_locks)
-        println("\t$(threadid()) - beliefs locked")
-            for (i,a) in enumerate(ACT)
-                @show all(islocked.(tree.b_locks))
+        for (i,a) in enumerate(ACT)
                 anode = init_idx + i
                 println("pre a lock push")
-                push!(tree.a_locks, lock(ReentrantLock()))
-                println("pushed a locks")
+                push!(tree.a_locks, ReentrantLock())
+                println("pushed a lock")
                 push!(tree.n, Atomic{Int}(0))
+                println("pushed to tree.n")
                 push!(tree.v, 0.0)
+                println("pushed to tree.v")
                 push!(tree.generated, Pair{O,Int}[])
+                println("pushed to tree.generated")
                 push!(tree.a_labels, a)
+                println("pushed to tree.a_labels")
                 push!(tree.n_a_children, Atomic{Int}(0))
+                println("pushed to tree.n_a_children")
 
                 push!(tree.tried[h], anode)
-                atomic_add!(tree.n_tried[h], 1)
+                println("pushed to tree.tried[h]")
+                tree.n_tried[h] += 1
+                println("added to tree.n_tried[h]")
             end
-
-        unlock.(tree.b_locks)
-        println("\t$(threadid()) - beliefs unlocked")
-        unlock.(tree.a_locks)
-        println("\t$(threadid()) - actions unlocked")
     end
     unlock(tree.tree_lock)
     println("$(threadid()) - tree unlocked")
@@ -51,15 +48,14 @@ function push_action_pw!(
 
     lock(tree.b_locks[h])
     N = tree.total_n[h][]
-    if tree.n_tried[h][] ≤ k_a*N^α_a
+    if tree.n_tried[h] ≤ k_a*N^α_a
         anode = length(tree.n) + 1
         a = rand(rng, actions(problem))
         if !sol.check_repeat_act || !haskey(tree.o_child_lookup, (h,a))
-            atomic_add!(tree.n_tried[h], 1)
+            tree.n_tried[h] +=  1
             unlock(tree.b_locks[h])
 
             lock(tree.tree_lock)
-                lock.(tree.a_locks)
                     push!(tree.a_locks, ReentrantLock())
                     push!(tree.n, Atomic{Int}(0))
                     push!(tree.v, 0.0)
@@ -67,11 +63,8 @@ function push_action_pw!(
                     push!(tree.a_labels, a)
                     push!(tree.n_a_children, Atomic{Int}(0))
                     update_lookup && (tree.o_child_lookup[(h, a)] = anode)
-                unlock.(tree.a_locks)
 
-                lock.(tree.b_locks)
                     push!(tree.tried[h], anode)
-                unlock.(tree.b_locks)
             unlock(tree.tree_lock)
         else
             unlock(tree.b_locks[h])
@@ -105,9 +98,7 @@ function push_belief_pw!(
             hao = tree.a_child_lookup[(best_node, o)]
 
             lock(tree.tree_lock)
-                lock.(tree.a_locks)
                     push!(tree.generated[best_node], o=>hao)
-                unlock.(tree.a_locks)
             unlock(tree.tree_lock)
 
         else
@@ -116,22 +107,18 @@ function push_belief_pw!(
             unlock(tree.a_locks[best_node])
 
             lock(tree.tree_lock)
-            lock.(tree.b_locks)
                 hao = length(tree.sr_beliefs) + 1
                 push!(tree.sr_beliefs,
                       init_node_sr_belief(sol.node_sr_belief_updater,
                                           problem, s, a, sp, o, r))
                 push!(tree.total_n, Atomic{Int}(0))
                 push!(tree.tried, Int[])
-                push!(tree.n_tried, Atomic{Int}(0))
+                push!(tree.n_tried, 0)
                 push!(tree.o_labels, o)
                 check_repeat_obs && (tree.a_child_lookup[(best_node, o)] = hao)
                 push!(tree.b_locks, ReentrantLock())
-            unlock.(tree.b_locks[1:end-1])
 
-            lock.(tree.a_locks)
                 push!(tree.generated[best_node], o=>hao)
-            unlock.(tree.a_locks)
 
             unlock(tree.tree_lock)
 
