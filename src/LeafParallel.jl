@@ -56,7 +56,7 @@ function rollout(estim::ParallelRandomRolloutEstimator, rng::Random.AbstractRNG,
     return r_total
 end
 
-struct LeafParallelPOWSolver{POW <: POMCPOWSolver, RNG <: Random.AbstractRNG}
+struct LeafParallelPOWSolver{POW <: POMCPOWSolver} <: Solver
     solver::POW
     procs::Int
 end
@@ -68,3 +68,67 @@ function LeafParallelPOWSolver(;procs::Int=1, kwargs...)
         kwargs...
     )
 end
+
+struct LeafParallelPOWPlanner{POW<:POMCPOWPlanner} <: Policy
+    powplanner::POW
+    procs::Int
+end
+
+function POMDPs.solve(sol::LeafParallelPOWSolver, pomdp::POMDP)
+    pomcp = sol.solver
+    pomcp.estimate_value = ParallelRandomRolloutSolver(sol.procs)
+    return LeafParallelPOWPlanner(solve(pomcp, pomdp), sol.procs)
+end
+
+function POMDPModelTools.action_info(planner::LeafParallelPOWPlanner, b)
+    t0 = time()
+    pomcp = planner.powplanner
+    A = actiontype(pomcp.problem)
+    info = Dict{Symbol, Any}()
+    tree = POMCPOW.make_tree(pomcp, b)
+    pomcp.tree = tree
+    local a::A
+    try
+        a = new_search(pomcp, tree, info)
+        if pomcp.solver.tree_in_info
+            info[:tree] = tree
+        end
+    catch ex
+        a = convert(A, POMCPOW.default_action(pomcp.solver.default_action, pomcp.problem, b, ex))
+    end
+    return a, info
+end
+
+function new_search(pomcp::POMCPOWPlanner, tree::POMCPOWTree, info::Dict{Symbol,Any}=Dict{Symbol,Any}())
+    all_terminal = true
+    i = 0
+    max_depth = min(
+        pomcp.solver.max_depth,
+        ceil(Int, log(pomcp.solver.eps)/log(discount(pomcp.problem)))
+    )
+    t0 = time()
+    while i < pomcp.solver.tree_queries
+        i += 1
+        s = rand(pomcp.solver.rng, tree.root_belief)
+        if !POMDPs.isterminal(pomcp.problem, s)
+
+            POMCPOW.simulate(pomcp, POWTreeObsNode(tree, 1), s, max_depth)
+            all_terminal = false
+        end
+        if time() - t0 > pomcp.solver.max_time
+            break
+        end
+    end
+    info[:search_time] = time() - t0
+    info[:tree_queries] = i
+
+    if all_terminal
+        throw(AllSamplesTerminal(tree.root_belief))
+    end
+
+    best_node = POMCPOW.select_best(pomcp.solver.final_criterion, POWTreeObsNode(tree,1), pomcp.solver.rng)
+
+    return tree.a_labels[best_node]
+end
+
+POMDPs.action(planner::LeafParallelPOWPlanner, b) = first(action_info(planner, b))
