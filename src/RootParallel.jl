@@ -52,7 +52,7 @@ function tree_info(pomcp::POMCPOWPlanner{P,NBU}, b) where {P,NBU}
     return tree, empty_tree
 end
 
-struct RootParallelPOWSolver{SOL<:POMCPOWSolver}
+struct RootParallelPOWSolver{SOL<:POMCPOWSolver} <: Solver
     powsolver::SOL
     procs::Int
 end
@@ -69,7 +69,7 @@ function RootParallelPOWSolver(;procs::Int=1, kwargs...)
     )
 end
 
-struct RootParallelPOWPlanner{P<:POMDP, POW<:POMCPOWPlanner}
+struct RootParallelPOWPlanner{P<:POMDP, POW<:POMCPOWPlanner} <: Policy
     pomdp::P
     planners::Vector{POW}
 end
@@ -99,12 +99,13 @@ function baseQ(planner::POMCPOWPlanner{P}, b) where P
 
     root = first(tree.tried)
     A = actiontype(P)
-    Q_vec = Vector{Pair{A,Float64}}(undef, length(root))
+    Q_vec = Vector{Tuple{A,Float64,Int}}(undef, length(root))
 
     for (i,anode) in enumerate(root)
         a = tree.a_labels[anode]
         v = tree.v[anode]
-        Q_vec[i] = (a => v)
+        n = tree.n[anode]
+        Q_vec[i] = (a,v,n)
     end
 
     return Q_vec
@@ -117,7 +118,7 @@ Merge Q values produced by multiple trees
 INPUT: Vector of outputs produced by `baseQ`
 OUTPUT: Single dictionary mapping `a => Q(b,a)`
 """
-function merge_Q_vecs(all_Qs::Vector{Vector{Pair{A, Float64}}}) where A
+function merge_Q_vecs(all_Qs::Vector{Vector{Tuple{A, Float64, Int}}}) where A
     #=
     TODO: Weight Q estimates by number of visits (i.e. the N in UCB eq.)
     Currently performing summation over Q which is proportional to
@@ -126,11 +127,16 @@ function merge_Q_vecs(all_Qs::Vector{Vector{Pair{A, Float64}}}) where A
     Q value estimates would look weird because they're not actually
     Q values but rather a *sum* of estimated Q values.
     =#
+    count_dict = Dict{A,Int}()
     final_dict = Dict{A, Float64}()
     for planner_Qs in all_Qs
-        for (a,v) in planner_Qs
+        for (a,v,n) in planner_Qs
             q = get(final_dict, a, 0.0)
-            final_dict[a] = q + v
+            N = get(count_dict, a, 0)
+            n_tot = n + N
+            Q = q + (1/n_tot)*(v - q)
+            final_dict[a] = Q
+            N == 0 ? (count_dict[a] = n) : (count_dict[a] = n)
         end
     end
     return final_dict
@@ -152,7 +158,7 @@ function POMDPModelTools.action_info(planner::RootParallelPOWPlanner, b)
     t0 = time()
     planner_vec = planner.planners
     A = actiontype(planner.pomdp)
-    vec = Vector{Vector{Pair{A, Float64}}}(undef, length(planner_vec))
+    vec = Vector{Vector{Tuple{A,Float64,Int}}}(undef, length(planner_vec))
 
     Threads.@threads for i in eachindex(vec)
         vec[i] = baseQ(planner_vec[i], b)
