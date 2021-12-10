@@ -3,37 +3,37 @@ function push_all_actions!(
         tree::TreeParallelPOWTree{B,A,O},
         h::Int) where {B,A,O}
 
-    lock(tree.tree_lock)
-    println("$(threadid()) - tree locked")
+    # lock(tree.tree_lock)
+    # @debug("$(threadid()) - tree locked")
     if isempty(tree.tried[h])
-        println("$(threadid()) - node $h empty")
+        @debug("$(threadid()) - node $h empty")
         ACT = actions(problem)
         L = length(ACT)
         init_idx = length(tree.n)
         for (i,a) in enumerate(ACT)
                 anode = init_idx + i
-                println("pre a lock push")
+                @debug("$(threadid()) - pre a lock push")
                 push!(tree.a_locks, ReentrantLock())
-                println("pushed a lock")
+                @debug("$(threadid()) - pushed a lock")
                 push!(tree.n, Atomic{Int}(0))
-                println("pushed to tree.n")
+                @debug("$(threadid()) - pushed to tree.n")
                 push!(tree.v, 0.0)
-                println("pushed to tree.v")
+                @debug("$(threadid()) - pushed to tree.v")
                 push!(tree.generated, Pair{O,Int}[])
-                println("pushed to tree.generated")
+                @debug("$(threadid()) - pushed to tree.generated")
                 push!(tree.a_labels, a)
-                println("pushed to tree.a_labels")
+                @debug("$(threadid()) - pushed to tree.a_labels")
                 push!(tree.n_a_children, Atomic{Int}(0))
-                println("pushed to tree.n_a_children")
+                @debug("$(threadid()) - pushed to tree.n_a_children")
 
                 push!(tree.tried[h], anode)
-                println("pushed to tree.tried[h]")
+                @debug("$(threadid()) - pushed to tree.tried[h]")
                 tree.n_tried[h] += 1
-                println("added to tree.n_tried[h]")
+                @debug("$(threadid()) - added to tree.n_tried[h]")
             end
     end
-    unlock(tree.tree_lock)
-    println("$(threadid()) - tree unlocked")
+    # unlock(tree.tree_lock)
+    @debug("$(threadid()) - tree unlocked")
 end
 
 function push_action_pw!(
@@ -46,16 +46,16 @@ function push_action_pw!(
     k_a, α_a = sol.k_action, sol.alpha_action
     update_lookup = sol.check_repeat_act
 
-    lock(tree.b_locks[h])
+    # lock(tree.b_locks[h])
     N = tree.total_n[h][]
     if tree.n_tried[h] ≤ k_a*N^α_a
         anode = length(tree.n) + 1
         a = rand(rng, actions(problem))
         if !sol.check_repeat_act || !haskey(tree.o_child_lookup, (h,a))
             tree.n_tried[h] +=  1
-            unlock(tree.b_locks[h])
+            # unlock(tree.b_locks[h])
 
-            lock(tree.tree_lock)
+            # lock(tree.tree_lock)
                     push!(tree.a_locks, ReentrantLock())
                     push!(tree.n, Atomic{Int}(0))
                     push!(tree.v, 0.0)
@@ -65,12 +65,12 @@ function push_action_pw!(
                     update_lookup && (tree.o_child_lookup[(h, a)] = anode)
 
                     push!(tree.tried[h], anode)
-            unlock(tree.tree_lock)
+            # unlock(tree.tree_lock)
         else
-            unlock(tree.b_locks[h])
+            # unlock(tree.b_locks[h])
         end
     else
-        unlock(tree.b_locks[h])
+        # unlock(tree.b_locks[h])
     end
 end
 
@@ -87,26 +87,26 @@ function push_belief_pw!(
     check_repeat_obs = sol.check_repeat_obs
     k_o, α_o = sol.k_observation, sol.alpha_observation
 
-    lock(tree.a_locks[best_node])
+    # lock(tree.a_locks[best_node])
     N = tree.n[best_node][]
     Na = tree.n_a_children[best_node][]
     if Na ≤ k_o*N^α_o
         sp, o, r = @gen(:sp, :o, :r)(problem, s, a, rng)
 
         if check_repeat_obs && haskey(tree.a_child_lookup, (best_node,o))
-            unlock(tree.a_locks[best_node])
+            # unlock(tree.a_locks[best_node])
             hao = tree.a_child_lookup[(best_node, o)]
 
-            lock(tree.tree_lock)
+            # lock(tree.tree_lock)
                     push!(tree.generated[best_node], o=>hao)
-            unlock(tree.tree_lock)
+            # unlock(tree.tree_lock)
 
         else
             new_node = true
             atomic_add!(tree.n_a_children[best_node], 1)
-            unlock(tree.a_locks[best_node])
+            # unlock(tree.a_locks[best_node])
 
-            lock(tree.tree_lock)
+            # lock(tree.tree_lock)
                 hao = length(tree.sr_beliefs) + 1
                 push!(tree.sr_beliefs,
                       init_node_sr_belief(sol.node_sr_belief_updater,
@@ -120,11 +120,11 @@ function push_belief_pw!(
 
                 push!(tree.generated[best_node], o=>hao)
 
-            unlock(tree.tree_lock)
+            # unlock(tree.tree_lock)
 
         end
     else
-        unlock(tree.a_locks[best_node])
+        # unlock(tree.a_locks[best_node])
         sp, r = @gen(:sp, :r)(problem, s, a, rng)
     end
 
