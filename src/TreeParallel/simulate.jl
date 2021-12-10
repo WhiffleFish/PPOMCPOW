@@ -38,11 +38,9 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
         @debug pair
         o = pair.first
         hao = pair.second
-        lock(tree.tree_lock)
-            lock.(tree.b_locks)
-                push_weighted!(tree.sr_beliefs[hao], pomcp.node_sr_belief_updater, s, sp, r)
-            unlock.(tree.b_locks)
-        unlock(tree.tree_lock)
+        lock(tree.b_locks[hao])
+            push_weighted!(tree.sr_beliefs[hao], pomcp.node_sr_belief_updater, s, sp, r)
+        unlock(tree.b_locks[hao])
         sp, r = rand(rng, tree.sr_beliefs[hao])
 
         R = r + γ*simulate(pomcp, TreeParallelPOWTreeObsNode(tree, hao), sp, d-1, rng)
