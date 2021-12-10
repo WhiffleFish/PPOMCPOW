@@ -47,7 +47,7 @@ function push_action_pw!(
     update_lookup = sol.check_repeat_act
 
     lock(tree.b_locks[h])
-    N = tree.total_n[h][]
+    N = tree.total_n[h]
     if tree.n_tried[h] ≤ k_a*N^α_a
         anode = length(tree.n) + 1
         a = rand(rng, actions(problem))
@@ -103,27 +103,28 @@ function push_belief_pw!(
 
         else
             new_node = true
-            atomic_add!(tree.n_a_children[best_node], 1)
             unlock(tree.a_locks[best_node])
 
             lock(tree.tree_lock)
+
                 hao = length(tree.sr_beliefs) + 1
                 push!(tree.sr_beliefs,
                       init_node_sr_belief(sol.node_sr_belief_updater,
                                           problem, s, a, sp, o, r))
-                push!(tree.total_n, Atomic{Int}(0))
+                push!(tree.total_n, 0)
                 push!(tree.tried, Int[])
                 push!(tree.n_tried, 0)
                 push!(tree.o_labels, o)
                 check_repeat_obs && (tree.a_child_lookup[(best_node, o)] = hao)
                 push!(tree.b_locks, ReentrantLock())
-
+                atomic_add!(tree.n_a_children[best_node], 1)
                 push!(tree.generated[best_node], o=>hao)
 
             unlock(tree.tree_lock)
 
         end
     else
+        isempty(tree.generated[best_node]) && @warn("generated empty after pw")
         unlock(tree.a_locks[best_node])
         sp, r = @gen(:sp, :r)(problem, s, a, rng)
     end

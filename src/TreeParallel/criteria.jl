@@ -1,38 +1,68 @@
+# function select_best(tree::TreeParallelPOWTree, crit::MaxUCB, h_node::TreeParallelPOWTreeObsNode, rng::AbstractRNG)
+#     h = h_node.node
+#     best_criterion_val = -Inf
+#     local best_node::Int
+#     istied = false
+#     local tied::Vector{Int}
+#     ltn = log(tree.total_n[h][])
+#     for node in tree.tried[h]
+#         n = tree.n[node][]
+#         if n == 0 && ltn <= 0.0
+#             criterion_value = tree.v[node]
+#         elseif n == 0 && tree.v[node] == -Inf
+#             criterion_value = Inf
+#         else
+#             criterion_value = tree.v[node] + crit.c*sqrt(ltn/n)
+#         end
+#         if criterion_value > best_criterion_val
+#             best_criterion_val = criterion_value
+#             best_node = node
+#             istied = false
+#         elseif criterion_value == best_criterion_val
+#             if istied
+#                 push!(tied, node)
+#             else
+#                 istied = true
+#                 tied = [best_node, node]
+#             end
+#         end
+#     end
+#     if istied
+#         return rand(rng, tied)
+#     else
+#         return best_node
+#     end
+# end
+
 function select_best(tree::TreeParallelPOWTree, crit::MaxUCB, h_node::TreeParallelPOWTreeObsNode, rng::AbstractRNG)
     h = h_node.node
-    best_criterion_val = -Inf
-    local best_node::Int
-    istied = false
-    local tied::Vector{Int}
-    ltn = log(tree.total_n[h][])
+    iszero(tree.total_n[h]) && return rand(rng, tree.tried[h])
+    best_ucb = -Inf
+    c = crit.c
+    best_node = 0
+    tied = Int[]
+
+    logtn = log(tree.total_n[h])
     for node in tree.tried[h]
         n = tree.n[node][]
-        if n == 0 && ltn <= 0.0
-            criterion_value = tree.v[node]
-        elseif n == 0 && tree.v[node] == -Inf
-            criterion_value = Inf
-        else
-            criterion_value = tree.v[node] + crit.c*sqrt(ltn/n)
-        end
-        if criterion_value > best_criterion_val
-            best_criterion_val = criterion_value
-            best_node = node
-            istied = false
-        elseif criterion_value == best_criterion_val
-            if istied
-                push!(tied, node)
-            else
-                istied = true
-                tied = [best_node, node]
-            end
+        q = tree.v[node]
+        ucb = q + c*sqrt(logtn/n)
+        if ucb > best_ucb
+            best_ucb = ucb
+            empty!(tied)
+            push!(tied, node)
+        elseif ucb == best_ucb
+            push!(tied, node)
         end
     end
-    if istied
-        return rand(rng, tied)
+
+    if length(tied) === 1
+        return only(tied)
     else
-        return best_node
+        return rand(rng, tied)
     end
 end
+
 
 function select_best(tree::TreeParallelPOWTree, crit::MaxQ, h_node::TreeParallelPOWTreeObsNode, rng::AbstractRNG)
     tree = h_node.tree

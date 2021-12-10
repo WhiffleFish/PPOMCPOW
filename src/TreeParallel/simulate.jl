@@ -25,6 +25,8 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
     sp, r, new_node = push_belief_pw!(pomcp, tree, best_node, s, a, rng)
     @debug("$(threadid()) - End Observation Widening")
 
+    isempty(tree.generated[best_node]) && @warn("generated empty")
+
     if isinf(r)
         @warn("POMCPOW: +Inf reward. This is not recommended and may cause future errors.")
     end
@@ -33,6 +35,7 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
         R = r + γ*estimate_value(pomcp.solved_estimate, problem, sp, d-1, rng)
     else
         pair = rand(rng, tree.generated[best_node])
+        @debug pair
         o = pair.first
         hao = pair.second
         lock(tree.tree_lock)
@@ -46,9 +49,11 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
     end
     @debug("Finish Observation Widening")
 
-    atomic_add!(tree.n[best_node], 1)
-    atomic_add!(tree.total_n[h], 1)
+
+    tree.total_n[h] += 1 # not thread safe!
+
     lock(tree.a_locks[best_node])
+    atomic_add!(tree.n[best_node], 1)
     if tree.v[best_node] != -Inf # when would this ever be the case?
         tree.v[best_node] += (R-tree.v[best_node])/tree.n[best_node][]
     end

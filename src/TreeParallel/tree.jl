@@ -9,7 +9,7 @@ struct TreeParallelPOWTree{B,A,O,RB}
 
     # observation nodes
     sr_beliefs::Vector{B} # b_idx => particle_belief    (first element is #undef)
-    total_n::Vector{Atomic{Int}} # b_idx => num of times b_idx was visited in search
+    total_n::Vector{Int} # b_idx => num of times b_idx was visited in search
     tried::Vector{Vector{Int}} # b_idx => [ba_idx1, ba_idx2, ..., ba_idxn] (may not even need this if we have n_tried)
     n_tried::Vector{Int} # b_idx => length(tried[b_idx])
     o_child_lookup::Dict{Tuple{Int,A}, Int} # (b_idx,a) => ba_idx
@@ -33,7 +33,7 @@ struct TreeParallelPOWTree{B,A,O,RB}
             sizehint!(Atomic{Int}[], sz),
 
             sizehint!(Array{B}(undef, 1), sz),
-            sizehint!(Atomic{Int}[Atomic{Int}(0)], sz),
+            sizehint!(Int[0], sz),
             sizehint!(Vector{Int}[Int[]], sz),
             sizehint!(Int[0], sz),
             Dict{Tuple{Int,A}, Int}(),
