@@ -3,7 +3,7 @@ using POMDPs, POMDPModels, POMDPModelTools
 using POMCPOW
 
 pomdp = LightDark1D()
-sol = RootParallelPOWSolver(procs=4, tree_queries=100_000)
+sol = RootParallelPOWSolver(procs=10, tree_queries=100_000)
 planner = solve(sol, pomdp)
 a, info = action_info(planner, initialstate(pomdp))
 
