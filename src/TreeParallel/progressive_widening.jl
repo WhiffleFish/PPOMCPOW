@@ -107,9 +107,9 @@ function push_belief_pw!(
                 push!(tree.o_labels, o)
                 check_repeat_obs && (tree.a_child_lookup[(best_node, o)] = hao)
                 push!(tree.b_locks, SpinLock())
-                atomic_add!(tree.n_a_children[best_node], 1)
-                push!(tree.generated[best_node], o=>hao)
 
+                push!(tree.generated[best_node], o=>hao)
+                atomic_add!(tree.n_a_children[best_node], 1)
             unlock(tree.tree_lock)
 
         end
