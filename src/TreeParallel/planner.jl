@@ -76,6 +76,7 @@ function search(pomcp::TreeParallelPOWPlanner, tree::TreeParallelPOWTree)
     ##
 
     # println("Before sim start")
+    # methodology from  https://github.com/kykim0/MCTS.jl/blob/dev/src/vanilla.jl
     timeout = t0 + max_time
     sim_channel = Channel{Task}(min(1000, max_iter), spawn=true) do channel
         for n in 1:max_iter
@@ -109,58 +110,4 @@ function search(pomcp::TreeParallelPOWPlanner, tree::TreeParallelPOWTree)
     best_node = select_best(tree, pomcp.solver.final_criterion, TreeParallelPOWTreeObsNode(tree,1), pomcp.solver.rng)
 
     return tree.a_labels[best_node], iter, t0
-end
-
-"""
-Task Producer/Distributer - Fills channel with a symbolic `:job` signal for the
-`task_taker` to `take!` as an indicator to run tree queries. Once tree query
-limit is reached or the maximum time has elapsed, `:job` signals are no longer
-produced and the channel is closed.
-"""
-function task_producer(chnl::Channel, t0::Float64, pomcp::TreeParallelPOWPlanner)
-    max_iter = pomcp.solver.tree_queries
-    max_time = pomcp.solver.max_time
-    iter = 0
-    while time() - t0 < max_time && iter < max_iter
-        if length(chnl.data) < 2
-            # @show iter
-            iter += 1
-            put!(chnl, :job)
-        end
-    end
-    close(chnl)
-    return iter
-end
-
-"""
-While channel is open, `task_taker` operates on a worker thread running tree
-queries whenever the `:job` signal is taken from the channel. Process stops when
-channel is closed by `task_producer`.
-"""
-function task_taker(chnl::Channel, pomcp::TreeParallelPOWPlanner, tree::TreeParallelPOWTree)
-    max_depth = min(
-        pomcp.solver.max_depth,
-        ceil(Int, log(pomcp.solver.eps)/log(discount(pomcp.problem)))
-    )
-
-    while true
-        # println("Channel Open")
-        # @show isready(chnl)
-        try
-            take!(chnl)
-        catch ex
-            if ex isa InvalidStateException
-                break
-            else
-                throw(ex)
-            end
-        end
-        # println("Thread $(Threads.threadid()) took a job")
-        rng = pomcp.rngs[Threads.threadid()]
-        s = rand(rng, tree.root_belief)
-        if !isterminal(pomcp.problem, s)
-            simulate(pomcp, TreeParallelPOWTreeObsNode(tree, 1), s, max_depth, rng)
-        end
-        # println("Thread $(Threads.threadid()) completed a job")
-    end
 end

@@ -13,7 +13,7 @@ function push_all_actions!(
         for (i,a) in enumerate(ACT)
                 anode = init_idx + i
                 @debug("$(threadid()) - pre a lock push")
-                push!(tree.a_locks, ReentrantLock())
+                push!(tree.a_locks, SpinLock())
                 @debug("$(threadid()) - pushed a lock")
                 push!(tree.n, Atomic{Int}(0))
                 @debug("$(threadid()) - pushed to tree.n")
@@ -56,7 +56,7 @@ function push_action_pw!(
             unlock(tree.b_locks[h])
 
             lock(tree.tree_lock)
-                    push!(tree.a_locks, ReentrantLock())
+                    push!(tree.a_locks, SpinLock())
                     push!(tree.n, Atomic{Int}(0))
                     push!(tree.v, 0.0)
                     push!(tree.generated, Pair{O,Int}[])
@@ -116,7 +116,7 @@ function push_belief_pw!(
                 push!(tree.n_tried, 0)
                 push!(tree.o_labels, o)
                 check_repeat_obs && (tree.a_child_lookup[(best_node, o)] = hao)
-                push!(tree.b_locks, ReentrantLock())
+                push!(tree.b_locks, SpinLock())
                 atomic_add!(tree.n_a_children[best_node], 1)
                 push!(tree.generated[best_node], o=>hao)
 

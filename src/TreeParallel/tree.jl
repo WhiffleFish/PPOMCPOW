@@ -15,9 +15,9 @@ struct TreeParallelPOWTree{B,A,O,RB}
     o_child_lookup::Dict{Tuple{Int,A}, Int} # (b_idx,a) => ba_idx
     o_labels::Vector{O} # b'_idx => o (b'=τ(b,a,o)) (first element is #undef)
 
-    tree_lock::ReentrantLock # Lock full tree to prevent any modification by other threads
-    b_locks::Vector{ReentrantLock} # belief thread locks
-    a_locks::Vector{ReentrantLock} # action thread locks
+    tree_lock::SpinLock # Lock full tree to prevent any modification by other threads
+    b_locks::Vector{SpinLock} # belief thread locks
+    a_locks::Vector{SpinLock} # action thread locks
 
     # root
     root_belief::RB
@@ -39,9 +39,9 @@ struct TreeParallelPOWTree{B,A,O,RB}
             Dict{Tuple{Int,A}, Int}(),
             sizehint!(Array{O}(undef, 1), sz),
 
-            ReentrantLock(),
-            sizehint!(ReentrantLock[ReentrantLock()], sz),
-            sizehint!(ReentrantLock[ReentrantLock()], sz),
+            SpinLock(),
+            sizehint!(SpinLock[SpinLock()], sz),
+            sizehint!(SpinLock[SpinLock()], sz),
 
             root_belief
         )
