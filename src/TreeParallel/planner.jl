@@ -37,16 +37,20 @@ function POMDPModelTools.action_info(pomcp::TreeParallelPOWPlanner, b)
     local a::A
     local iter::Int
     local t0::Float64
-    # try
+    try
         a, iter, t0 = search(pomcp, tree)
-    # catch ex
-    #     if ex isa AllSamplesTerminal
-    #         @warn("All Samples Terminal")
-    #         a = rand(actions(pomcp.problem))
-    #     else
-    #         throw(ex)
-    #     end
-    # end
+    catch ex
+        if ex isa AllSamplesTerminal
+            @warn("All Samples Terminal")
+            a = rand(actions(pomcp.problem))
+        else
+            # throw(ex)
+            @warn typeof(ex)
+            a = rand(actions(pomcp.problem))
+            iter = 0
+            t0 = time()
+        end
+    end
     return a, (tree_queries=iter, time=time()-t0)
 end
 
