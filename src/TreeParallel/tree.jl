@@ -6,6 +6,7 @@ struct TreeParallelPOWTree{B,A,O,RB}
     a_child_lookup::Dict{Tuple{Int,O}, Int} # (ba_idx,o) => b_idx
     a_labels::Vector{A} # ba_idx => a
     n_a_children::Vector{Atomic{Int}} # ba_idx => n_children
+    o::Vector{Atomic{Int}} # ba_idx => number of threads exploring ba_idx
 
     # observation nodes
     sr_beliefs::Vector{B} # b_idx => particle_belief    (first element is #undef)
@@ -30,6 +31,7 @@ struct TreeParallelPOWTree{B,A,O,RB}
             sizehint!(Vector{Pair{O,Int}}[], sz),
             Dict{Tuple{Int,O}, Int}(),
             sizehint!(A[], sz),
+            sizehint!(Atomic{Int}[], sz),
             sizehint!(Atomic{Int}[], sz),
 
             sizehint!(Array{B}(undef, 1), sz),

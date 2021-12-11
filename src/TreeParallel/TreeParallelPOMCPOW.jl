@@ -19,6 +19,6 @@ include("progressive_widening.jl")
 include("simulate.jl")
 
 export TreeParallelPOWSolver, TreeParallelPOWPlanner
-
+export VirtualLoss
 
 end # module

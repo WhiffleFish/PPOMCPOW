@@ -16,6 +16,7 @@ function push_all_actions!(
                 push!(tree.generated, Pair{O,Int}[])
                 push!(tree.a_labels, a)
                 push!(tree.n_a_children, Atomic{Int}(0))
+                push!(tree.o, Atomic{Int}(0))
 
                 push!(tree.tried[h], anode)
                 tree.n_tried[h] += 1
@@ -50,6 +51,7 @@ function push_action_pw!(
                     push!(tree.generated, Pair{O,Int}[])
                     push!(tree.a_labels, a)
                     push!(tree.n_a_children, Atomic{Int}(0))
+                    push!(tree.o, Atomic{Int}(0))
                     update_lookup && (tree.o_child_lookup[(h, a)] = anode)
 
                     push!(tree.tried[h], anode)

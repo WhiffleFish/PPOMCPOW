@@ -16,11 +16,10 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
     end
 
     best_node = select_best(tree, pomcp.criterion, h_node, rng)
+    atomic_add!(tree.o[best_node], 1)
     a = tree.a_labels[best_node]
 
     sp, r, new_node = push_belief_pw!(pomcp, tree, best_node, s, a, rng)
-
-    isempty(tree.generated[best_node]) && @warn("generated empty")
 
     if isinf(r)
         @warn("POMCPOW: +Inf reward. This is not recommended and may cause future errors.")
@@ -39,7 +38,7 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
 
         R = r + γ*simulate(pomcp, TreeParallelPOWTreeObsNode(tree, hao), sp, d-1, rng)
     end
-
+    atomic_add!(tree.o[best_node], -1)
 
     tree.total_n[h] += 1 # not thread safe!
 
