@@ -69,26 +69,36 @@ function search(pomcp::TreeParallelPOWPlanner, tree::TreeParallelPOWTree)
         ceil(Int, log(pomcp.solver.eps)/log(discount(pomcp.problem)))
     )
     rngs = pomcp.rngs
-    iter = 0
-    @sync for i in 1:max_iter
-        i % 100 == 0 && @show time() - t0
-        if time() - t0 > max_time
-            @debug time() - t0
-            @debug "BREAK - Time Constraint Met"
-            break
+    ##
+
+    # println("Before sim start")
+    timeout = t0 + max_time
+    sim_channel = Channel{Task}(min(1000, max_iter), spawn=true) do channel
+        for n in 1:max_iter
+            put!(channel, Threads.@spawn begin
+                rng = rngs[threadid()]
+                simulate(
+                    pomcp,
+                    TreeParallelPOWTreeObsNode(tree, 1),
+                    rand(rng, tree.root_belief), max_depth, rng)
+                end)
         end
+        # println("Channel task finished ", channel)
+    end
+
+    iter = 0
+    for sim_task in sim_channel
         iter += 1
-        rng = rngs[threadid()]
-        Threads.@spawn begin
-            simulate(
-                pomcp,
-                TreeParallelPOWTreeObsNode(tree, 1),
-                rand(rng, tree.root_belief),
-                max_depth,
-                rng
-            )
+        time() > timeout && break
+        try
+            # println("Fetch ", counter)
+            fetch(sim_task)  # Throws a TaskFailedException if failed.
+        catch err
+            throw(err.task.exception)  # Throw the underlying exception.
         end
     end
+
+    ##
 
     length(tree.n) == 1 && throw(AllSamplesTerminal(tree.root_belief))
 
