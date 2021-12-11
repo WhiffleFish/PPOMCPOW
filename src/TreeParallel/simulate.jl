@@ -5,25 +5,20 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
     problem = pomcp.problem
     γ = POMDPs.discount(pomcp.problem)
 
-    @debug("$(threadid()) - Begin Simulate")
     if POMDPs.isterminal(problem, s) || d ≤ 0
         return 0.0
     end
 
-    @debug("$(threadid()) - Begin Action Widening")
     if sol.enable_action_pw
         push_action_pw!(pomcp, tree, h, rng)
     else
         push_all_actions!(problem, tree, h)
     end
-    @debug("$(threadid()) - End Action Widening")
 
     best_node = select_best(tree, pomcp.criterion, h_node, rng)
     a = tree.a_labels[best_node]
 
-    @debug("$(threadid()) - Begin Observation Widening")
     sp, r, new_node = push_belief_pw!(pomcp, tree, best_node, s, a, rng)
-    @debug("$(threadid()) - End Observation Widening")
 
     isempty(tree.generated[best_node]) && @warn("generated empty")
 
@@ -35,7 +30,6 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
         R = r + γ*estimate_value(pomcp.solved_estimate, problem, sp, d-1, rng)
     else
         pair = rand(rng, tree.generated[best_node])
-        @debug pair
         o = pair.first
         hao = pair.second
         lock(tree.b_locks[hao])
@@ -45,7 +39,6 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
 
         R = r + γ*simulate(pomcp, TreeParallelPOWTreeObsNode(tree, hao), sp, d-1, rng)
     end
-    @debug("Finish Observation Widening")
 
 
     tree.total_n[h] += 1 # not thread safe!
@@ -57,6 +50,5 @@ function simulate(pomcp::TreeParallelPOWPlanner, h_node::TreeParallelPOWTreeObsN
     end
     unlock(tree.a_locks[best_node])
 
-    @debug("End Simulation")
     return R
 end

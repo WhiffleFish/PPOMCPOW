@@ -4,36 +4,24 @@ function push_all_actions!(
         h::Int) where {B,A,O}
 
     lock(tree.tree_lock)
-    @debug("$(threadid()) - tree locked")
     if isempty(tree.tried[h])
-        @debug("$(threadid()) - node $h empty")
         ACT = actions(problem)
         L = length(ACT)
         init_idx = length(tree.n)
         for (i,a) in enumerate(ACT)
                 anode = init_idx + i
-                @debug("$(threadid()) - pre a lock push")
                 push!(tree.a_locks, SpinLock())
-                @debug("$(threadid()) - pushed a lock")
                 push!(tree.n, Atomic{Int}(0))
-                @debug("$(threadid()) - pushed to tree.n")
                 push!(tree.v, 0.0)
-                @debug("$(threadid()) - pushed to tree.v")
                 push!(tree.generated, Pair{O,Int}[])
-                @debug("$(threadid()) - pushed to tree.generated")
                 push!(tree.a_labels, a)
-                @debug("$(threadid()) - pushed to tree.a_labels")
                 push!(tree.n_a_children, Atomic{Int}(0))
-                @debug("$(threadid()) - pushed to tree.n_a_children")
 
                 push!(tree.tried[h], anode)
-                @debug("$(threadid()) - pushed to tree.tried[h]")
                 tree.n_tried[h] += 1
-                @debug("$(threadid()) - added to tree.n_tried[h]")
             end
     end
     unlock(tree.tree_lock)
-    @debug("$(threadid()) - tree unlocked")
 end
 
 function push_action_pw!(

@@ -31,6 +31,7 @@ end
 Random.seed!(p::TreeParallelPOWPlanner, seed) = Random.seed!(p.solver.rng, seed)
 
 function POMDPModelTools.action_info(pomcp::TreeParallelPOWPlanner, b)
+    t0 = time()
     A = actiontype(pomcp.problem)
     tree = make_tree(pomcp, b)
     pomcp.tree = tree
@@ -38,17 +39,17 @@ function POMDPModelTools.action_info(pomcp::TreeParallelPOWPlanner, b)
     local iter::Int
     local t0::Float64
     try
-        a, iter, t0 = search(pomcp, tree)
+        a, iter = search(pomcp, tree)
     catch ex
         if ex isa AllSamplesTerminal
             @warn("All Samples Terminal")
             a = rand(actions(pomcp.problem))
+            iter = 0
         else
             # throw(ex)
             @warn typeof(ex)
             a = rand(actions(pomcp.problem))
             iter = 0
-            t0 = time()
         end
     end
     return a, (tree_queries=iter, time=time()-t0)
@@ -109,5 +110,5 @@ function search(pomcp::TreeParallelPOWPlanner, tree::TreeParallelPOWTree)
 
     best_node = select_best(tree, pomcp.solver.final_criterion, TreeParallelPOWTreeObsNode(tree,1), pomcp.solver.rng)
 
-    return tree.a_labels[best_node], iter, t0
+    return tree.a_labels[best_node], iter
 end
