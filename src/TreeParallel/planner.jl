@@ -62,15 +62,33 @@ end
 
 function search(pomcp::TreeParallelPOWPlanner, tree::TreeParallelPOWTree)
     t0 = time()
-
-    chnl = Channel{Symbol}(5)
-    prod_task = Threads.@spawn task_producer(chnl, t0, pomcp)
-    n = (Threads.nthreads() ÷ 2) - 1
-    @sync for i in 1:n
-        Threads.@spawn task_taker(chnl, pomcp, tree)
+    max_iter = pomcp.solver.tree_queries
+    max_time = pomcp.solver.max_time
+    max_depth = min(
+        pomcp.solver.max_depth,
+        ceil(Int, log(pomcp.solver.eps)/log(discount(pomcp.problem)))
+    )
+    rngs = pomcp.rngs
+    iter = 0
+    @sync for i in 1:max_iter
+        i % 100 == 0 && @show time() - t0
+        if time() - t0 > max_time
+            @debug time() - t0
+            @debug "BREAK - Time Constraint Met"
+            break
+        end
+        iter += 1
+        rng = rngs[threadid()]
+        Threads.@spawn begin
+            simulate(
+                pomcp,
+                TreeParallelPOWTreeObsNode(tree, 1),
+                rand(rng, tree.root_belief),
+                max_depth,
+                rng
+            )
+        end
     end
-
-    iter = fetch(prod_task)
 
     length(tree.n) == 1 && throw(AllSamplesTerminal(tree.root_belief))
 
